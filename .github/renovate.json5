@@ -1,0 +1,43 @@
+{
+	$schema: 'https://docs.renovatebot.com/renovate-schema.json',
+	extends: ['config:recommended'],
+	dependencyDashboard: false,
+	platformAutomerge: true,
+	timezone: 'Europe/London',
+	schedule: ['before 5am'],
+	lockFileMaintenance: {
+		enabled: true,
+		schedule: ['before 3am on Monday'],
+	},
+	nix: {
+		enabled: true,
+	},
+	'github-actions': {
+		enabled: true,
+	},
+	packageRules: [
+		{
+			matchManagers: ['nix'],
+			matchPackageNames: ['nixpkgs'],
+			schedule: ['every weekend'],
+		},
+		{
+			matchManagers: ['github-actions'],
+			matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],
+			automerge: true,
+			automergeType: 'pr',
+			automergeStrategy: 'squash',
+		},
+		{
+			matchManagers: ['nix'],
+			matchFileNames: ['flake.lock'],
+			groupName: 'nix flake dependencies',
+			schedule: ['before 3am on Monday'],
+		},
+	],
+	prConcurrentLimit: 5,
+	prHourlyLimit: 10,
+	semanticCommits: 'enabled',
+	commitMessagePrefix: 'chore(deps):',
+	labels: ['dependencies'],
+}

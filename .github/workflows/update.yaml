@@ -1,0 +1,30 @@
+name: update-sources
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+jobs:
+  update-sources:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup-nix
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - id: update
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(./update.ts | tail -1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - run: 'git config user.email 41898282+github-actions[bot]@users.noreply.github.com'
+      - run: 'git config user.name github-actions[bot]'
+      - run: 'git add -A'
+      - name: Commit with version
+        run: |
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update bun to ${{ steps.update.outputs.version }}"
+          fi
+      - run: 'git push -u origin main'
