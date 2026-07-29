@@ -15,11 +15,15 @@ nix run 'github:ryoppippi/nix-bun#"1.3.12"'
 
 # Run explicit package attributes
 nix run github:ryoppippi/nix-bun#bun
+
+# Run the latest canary build
+nix run github:ryoppippi/nix-bun#canary
 ```
 
 ## Features
 
 - ✅ Automatic updates via GitHub Actions
+- ✅ Canary builds from Bun's rolling `canary` tag
 - ✅ Multi-platform support: Linux (x86_64, aarch64) and macOS (x86_64, aarch64)
 - ✅ Direct downloads from official Bun GitHub releases
 - ✅ SHA256 verification using release asset digests
@@ -231,12 +235,34 @@ nix run 'github:ryoppippi/nix-bun#"1.3.12"'
 
 All tracked versions are available in the [`versions/`](./versions) directory.
 
+## Canary
+
+The `canary` attribute tracks Bun's [rolling `canary` release](https://github.com/oven-sh/bun/releases/tag/canary), built from `main`:
+
+```bash
+nix run github:ryoppippi/nix-bun#canary
+nix shell github:ryoppippi/nix-bun#canary
+```
+
+```nix
+nix-bun.packages.${system}.canary
+```
+
+Two caveats apply because `canary` is a rolling tag rather than an immutable release:
+
+- Upstream replaces the assets on every build, so the pinned hashes in [`versions/canary.json`](./versions/canary.json) go stale within hours. A build against outdated hashes fails with a hash mismatch — refresh the flake input (`nix flake update nix-bun`) to pick up the latest hourly update.
+- Canary binaries report the unreleased base version (for example `1.4.0`), so the package version carries the snapshot date instead: `1.4.0-unstable-2026-07-29`. Use `bun --revision` to identify the exact commit.
+
+`canary` is never selected as the default package; `default` and `bun` always point at the latest stable release.
+
 ## How It Works
 
 1. `update.ts` queries the official GitHub Releases API.
 2. It reads release asset digests and converts them to SRI hashes.
 3. GitHub Actions updates `versions/*.json`.
 4. The flake installs the upstream release archive and exposes `bun`.
+
+For `canary`, the version reported by the binaries cannot be derived from the tag, so it is read from `package.json` on Bun's `main` branch.
 
 For x86_64 Linux and macOS, this flake uses Bun's `-baseline` assets for broader CPU compatibility.
 

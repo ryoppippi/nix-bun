@@ -23,7 +23,10 @@
       versionNames = builtins.map (f: nixpkgs.lib.removeSuffix ".json" f) (
         builtins.filter (f: nixpkgs.lib.hasSuffix ".json" f) (builtins.attrNames versionFiles)
       );
-      latestVersion = builtins.head (builtins.sort (a: b: builtins.compareVersions a b > 0) versionNames);
+      # "canary" tracks a rolling prerelease tag, so it is not comparable with
+      # the semver releases and must never be selected as the default package.
+      releaseNames = builtins.filter (v: v != "canary") versionNames;
+      latestVersion = builtins.head (builtins.sort (a: b: builtins.compareVersions a b > 0) releaseNames);
     in
     {
       packages = forAllSystems (

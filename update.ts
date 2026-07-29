@@ -8,6 +8,10 @@ import { join } from 'node:path';
 
 const REPO_API = 'https://api.github.com/repos/oven-sh/bun/releases';
 const DOWNLOAD_BASE = 'https://github.com/oven-sh/bun/releases/download';
+const MAIN_PACKAGE_JSON = 'https://raw.githubusercontent.com/oven-sh/bun/main/package.json';
+
+/** Rolling prerelease tag whose assets are replaced on every upstream build. */
+const CANARY = 'canary';
 
 const platforms = {
 	'x86_64-linux': 'bun-linux-x64-baseline.zip',
@@ -22,6 +26,7 @@ interface ReleaseAsset {
 	name: string;
 	browser_download_url: string;
 	digest: string | null;
+	updated_at: string;
 }
 
 interface Release {
@@ -33,6 +38,8 @@ interface Release {
 
 interface SourcesJSON {
 	version: string;
+	/** Expected `bun --version` output, when it differs from `version`. */
+	expectedVersion?: string;
 	platforms: Record<NixPlatform, { url: string; hash: string }>;
 }
 
@@ -94,7 +101,11 @@ async function getExistingVersions(): Promise<{
 	const versions: string[] = [];
 
 	for await (const f of glob.scan(versionsDir)) {
-		versions.push(f.replace(/\.json$/, ''));
+		const name = f.replace(/\.json$/, '');
+		if (name === CANARY) {
+			continue;
+		}
+		versions.push(name);
 	}
 
 	if (versions.length === 0) {
@@ -105,11 +116,23 @@ async function getExistingVersions(): Promise<{
 	return { versions: new Set(versions), latest: versions[versions.length - 1] };
 }
 
-async function writeVersionSources(
-	version: string,
-	hashes: Record<NixPlatform, string>,
-): Promise<void> {
-	const versionedPath = join(import.meta.dir, 'versions', `${version}.json`);
+/**
+ * Writes a `versions/<name>.json` sources file.
+ *
+ * @param options.name - File basename, either a semver version or `canary`.
+ * @param options.tag - Upstream release tag the download URLs point at.
+ * @param options.version - Version used by the Nix derivation.
+ * @param options.expectedVersion - `bun --version` output, when it differs from `version`.
+ * @param options.hashes - SRI hash per Nix platform.
+ */
+async function writeVersionSources(options: {
+	name: string;
+	tag: string;
+	version: string;
+	expectedVersion?: string;
+	hashes: Record<NixPlatform, string>;
+}): Promise<void> {
+	const versionedPath = join(import.meta.dir, 'versions', `${options.name}.json`);
 
 	const platformsData: Record<NixPlatform, { url: string; hash: string }> = {} as Record<
 		NixPlatform,
@@ -118,39 +141,114 @@ async function writeVersionSources(
 
 	for (const [nixPlatform, assetName] of Object.entries(platforms)) {
 		platformsData[nixPlatform as NixPlatform] = {
-			url: `${DOWNLOAD_BASE}/bun-v${version}/${assetName}`,
-			hash: hashes[nixPlatform as NixPlatform],
+			url: `${DOWNLOAD_BASE}/${options.tag}/${assetName}`,
+			hash: options.hashes[nixPlatform as NixPlatform],
 		};
 	}
 
 	const sourcesData: SourcesJSON = {
-		version,
+		version: options.version,
+		...(options.expectedVersion === undefined ? {} : { expectedVersion: options.expectedVersion }),
 		platforms: platformsData,
 	};
 
 	await Bun.write(versionedPath, JSON.stringify(sourcesData, null, 2) + '\n');
 }
 
-async function processRelease(release: Release): Promise<boolean> {
-	const version = tagToVersion(release.tag_name);
+/**
+ * Collects the SRI hash of every tracked platform asset of a release.
+ *
+ * @returns The hashes, or `null` if any tracked asset has no usable digest.
+ */
+async function collectHashes(
+	release: Release,
+	label: string,
+): Promise<Record<NixPlatform, string> | null> {
 	const hashes: Record<NixPlatform, string> = {} as Record<NixPlatform, string>;
 
 	for (const [nixPlatform, assetName] of Object.entries(platforms)) {
 		const asset = release.assets.find((candidate) => candidate.name === assetName);
 		if (!asset?.digest?.startsWith('sha256:')) {
-			console.warn(`  Skipping ${version}: missing digest for ${assetName}`);
-			return false;
+			console.warn(`  Skipping ${label}: missing digest for ${assetName}`);
+			return null;
 		}
 
 		hashes[nixPlatform as NixPlatform] = await sha256HexToSri(asset.digest.slice('sha256:'.length));
 	}
 
-	await writeVersionSources(version, hashes);
+	return hashes;
+}
+
+async function processRelease(release: Release): Promise<boolean> {
+	const version = tagToVersion(release.tag_name);
+	if (version === null) {
+		return false;
+	}
+
+	const hashes = await collectHashes(release, version);
+	if (hashes === null) {
+		return false;
+	}
+
+	await writeVersionSources({
+		name: version,
+		tag: `bun-v${version}`,
+		version,
+		hashes,
+	});
+	return true;
+}
+
+/**
+ * Updates `versions/canary.json` from the rolling `canary` tag.
+ *
+ * The tag carries no version information, so the version reported by the
+ * binaries is read from `package.json` on `main` — the same value upstream
+ * compiles into the canary builds. The derivation version additionally carries
+ * the snapshot date of the assets, following the nixpkgs `-unstable-<date>`
+ * convention, so that each rebuild is distinguishable.
+ */
+async function updateCanary(): Promise<boolean> {
+	const release = await fetchJSON<Release>(`${REPO_API}/tags/${CANARY}`);
+
+	const packageJsonResponse = await fetch(MAIN_PACKAGE_JSON);
+	if (!packageJsonResponse.ok) {
+		throw new Error(
+			`Failed to fetch bun package.json: ${packageJsonResponse.status} ${packageJsonResponse.statusText}`,
+		);
+	}
+	const { version: baseVersion } = (await packageJsonResponse.json()) as { version: string };
+
+	const hashes = await collectHashes(release, CANARY);
+	if (hashes === null) {
+		return false;
+	}
+
+	// Assets are re-uploaded on every canary build, so the newest asset
+	// timestamp is the snapshot date of what we just hashed.
+	const snapshot = release.assets
+		.map((asset) => asset.updated_at)
+		.reduce((newest, current) => (current > newest ? current : newest))
+		.slice(0, 'YYYY-MM-DD'.length);
+
+	const version = `${baseVersion}-unstable-${snapshot}`;
+
+	await writeVersionSources({
+		name: CANARY,
+		tag: CANARY,
+		version,
+		expectedVersion: baseVersion,
+		hashes,
+	});
+
+	console.log(`  Updated canary to ${version}`);
 	return true;
 }
 
 const { versions: existingVersions, latest: currentVersion } = await getExistingVersions();
-const allReleases = (await fetchAllReleases()).filter((release) => tagToVersion(release.tag_name) !== null);
+const allReleases = (await fetchAllReleases()).filter(
+	(release) => tagToVersion(release.tag_name) !== null,
+);
 const allVersions = allReleases
 	.map((release) => tagToVersion(release.tag_name))
 	.filter((version): version is string => version !== null);
@@ -192,6 +290,9 @@ if (missingVersions.length === 0) {
 		}
 	}
 }
+
+console.log('Processing canary...');
+await updateCanary();
 
 console.log('Formatting with oxfmt...');
 await $`oxfmt --config ${join(import.meta.dir, '.oxfmtrc.jsonc')} versions/*.json`.quiet();

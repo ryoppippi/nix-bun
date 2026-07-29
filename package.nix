@@ -12,6 +12,11 @@ let
   inherit (sourcesData) version;
   sources = sourcesData.platforms;
 
+  # Canary builds report the unreleased version declared upstream (e.g. "1.4.0")
+  # rather than the snapshot version this derivation is named after, so the
+  # expected `bun --version` output is recorded separately.
+  expectedVersion = sourcesData.expectedVersion or version;
+
   source =
     sources.${stdenv.hostPlatform.system}
       or (throw "Unsupported system: ${stdenv.hostPlatform.system}");
@@ -50,14 +55,14 @@ stdenv.mkDerivation rec {
     runHook preInstallCheck
 
     version_output="$($out/bin/bun --version)"
-    if [ "$version_output" != "${version}" ]; then
-      echo "ERROR: expected version ${version}, got $version_output"
+    if [ "$version_output" != "${expectedVersion}" ]; then
+      echo "ERROR: expected version ${expectedVersion}, got $version_output"
       exit 1
     fi
 
     bunx_version_output="$($out/bin/bunx --version)"
-    if [ "$bunx_version_output" != "${version}" ]; then
-      echo "ERROR: expected bunx version ${version}, got $bunx_version_output"
+    if [ "$bunx_version_output" != "${expectedVersion}" ]; then
+      echo "ERROR: expected bunx version ${expectedVersion}, got $bunx_version_output"
       exit 1
     fi
 
