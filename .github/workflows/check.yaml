@@ -13,8 +13,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-nix
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Run Gitleaks
         run: nix run nixpkgs#gitleaks -- detect --source . --config .gitleaks.toml
 
@@ -23,8 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-nix
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Run checks
         run: cd dev && nix flake check -L
 
@@ -36,8 +32,6 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-nix
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Build package
         run: nix build -L
       - name: Check version

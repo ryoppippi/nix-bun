@@ -28,7 +28,6 @@ nix run github:ryoppippi/nix-bun#canary
 - ✅ Direct downloads from official Bun GitHub releases
 - ✅ SHA256 verification using release asset digests
 - ✅ Flake and non-flake support
-- ✅ Binary cache via [Cachix](https://app.cachix.org/cache/ryoppippi) for faster builds
 
 ## Why Use This Flake?
 
@@ -39,53 +38,6 @@ Use this if you want:
 - the exact binaries published by the Bun project
 - faster packaging updates driven by GitHub Releases
 - simple installation without rebuilding Bun from source
-
-## Binary Cache (Cachix)
-
-This flake provides pre-built binaries via [Cachix](https://app.cachix.org/cache/ryoppippi). Using the binary cache avoids rebuilding packages locally and significantly speeds up installation.
-
-### Setup Cachix
-
-**Option 1: Using Cachix CLI**
-
-```bash
-cachix use ryoppippi
-```
-
-**Option 2: Manual Configuration**
-
-Add to your Nix configuration:
-
-```nix
-# NixOS (configuration.nix)
-nix.settings = {
-  substituters = [ "https://ryoppippi.cachix.org" ];
-  trusted-public-keys = [ "ryoppippi.cachix.org-1:b2LbtWNvJeL/qb1B6TYOMK+apaCps4SCbzlPRfSQIms=" ];
-};
-
-# Or in ~/.config/nix/nix.conf
-# extra-substituters = https://ryoppippi.cachix.org
-# extra-trusted-public-keys = ryoppippi.cachix.org-1:b2LbtWNvJeL/qb1B6TYOMK+apaCps4SCbzlPRfSQIms=
-```
-
-**Option 3: In your flake.nix**
-
-```nix
-{
-  nixConfig = {
-    extra-substituters = [ "https://ryoppippi.cachix.org" ];
-    extra-trusted-public-keys = [ "ryoppippi.cachix.org-1:b2LbtWNvJeL/qb1B6TYOMK+apaCps4SCbzlPRfSQIms=" ];
-  };
-}
-```
-
-**Option 4: Using devenv**
-
-```nix
-{
-  cachix.pull = [ "ryoppippi" ];
-}
-```
 
 ## Usage
 
@@ -201,8 +153,6 @@ inputs:
   packages = [
     inputs.nix-bun.packages.${pkgs.system}.default
   ];
-
-  cachix.pull = [ "ryoppippi" ];
 }
 ```
 
