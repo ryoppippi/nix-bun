@@ -82,12 +82,7 @@ stdenv.mkDerivation rec {
     license = licenses.mit;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     mainProgram = "bun";
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-      "x86_64-darwin"
-      "aarch64-darwin"
-    ];
+    platforms = import ./systems.nix;
     maintainers = [ ];
   };
 }
