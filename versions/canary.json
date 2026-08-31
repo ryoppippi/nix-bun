@@ -4,19 +4,19 @@
 	"platforms": {
 		"x86_64-linux": {
 			"url": "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64-baseline.zip",
-			"hash": "sha256-2iiNqwBYrpBaYhDkwlmNZCiohSkIc8PA6tfXDonHP34="
+			"hash": "sha256-dj0FiniN7Tmje3MYTH5bH/QXlaN6gUFkpxcjZZ2w300="
 		},
 		"aarch64-linux": {
 			"url": "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64.zip",
-			"hash": "sha256-UQKiNHHjuzeY0kZIJuC5R19PDghijjPMM3hA1SohnmA="
+			"hash": "sha256-q3QNa7WZkJDz3zk2mnyyyr8+e9+GOqgLvZ4WdEcn8KA="
 		},
 		"x86_64-darwin": {
 			"url": "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-x64-baseline.zip",
-			"hash": "sha256-TSoIROlS6u93hwMUPoSxCwEsZb8SW9uXWvpU7oQQFcI="
+			"hash": "sha256-yVg7a9Am755d8wzrnttqx1hJJCSD9HI7DQ7gfCWSrj4="
 		},
 		"aarch64-darwin": {
 			"url": "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-aarch64.zip",
-			"hash": "sha256-rfVbWqLnRICm65jiaRhg9HNZ3pQ0UZD+SZk4e8ZrlLQ="
+			"hash": "sha256-UthwyRvY/OQT6gMsqw0pHUkw8n7idAE7cAfW/p+HhNM="
 		}
 	}
 }
