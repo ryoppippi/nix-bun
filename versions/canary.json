@@ -1,6 +1,6 @@
 {
-	"version": "1.4.2-unstable-2026-09-05",
-	"expectedVersion": "1.4.2",
+	"version": "1.4.3-unstable-2026-09-05",
+	"expectedVersion": "1.4.3",
 	"platforms": {
 		"x86_64-linux": {
 			"url": "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64-baseline.zip",
