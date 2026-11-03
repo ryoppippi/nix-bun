@@ -22,6 +22,9 @@
       # the semver releases and must never be selected as the default package.
       releaseNames = builtins.filter (v: v != "canary") versionNames;
       latestVersion = builtins.head (builtins.sort (a: b: builtins.compareVersions a b > 0) releaseNames);
+      latestSourcesFile = ./versions/${latestVersion + ".json"};
+
+      mkBun = pkgs: sourcesFile: pkgs.callPackage ./package.nix { inherit sourcesFile; };
     in
     {
       packages = forAllSystems (
@@ -31,26 +34,25 @@
             inherit system;
           };
 
-          mkBun = sourcesFile: pkgs.callPackage ./package.nix { inherit sourcesFile; };
-
           versionedPackages = builtins.listToAttrs (
             builtins.map (version: {
               name = version;
-              value = mkBun ./versions/${version + ".json"};
+              value = mkBun pkgs ./versions/${version + ".json"};
             }) versionNames
           );
-
-          latestSourcesFile = ./versions/${latestVersion + ".json"};
         in
         {
-          bun = mkBun latestSourcesFile;
+          bun = mkBun pkgs latestSourcesFile;
           default = self.packages.${system}.bun;
         }
         // versionedPackages
       );
 
-      overlays.default = _final: prev: {
-        bun = self.packages.${prev.stdenv.hostPlatform.system}.bun;
+      # Build from the consumer's `final` rather than `self.packages`: the latter
+      # instantiates this flake's own nixpkgs, which every overlay user would
+      # then evaluate a second time.
+      overlays.default = final: _prev: {
+        bun = mkBun final latestSourcesFile;
       };
     };
 }
