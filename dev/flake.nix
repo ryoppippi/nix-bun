@@ -61,13 +61,7 @@
                 files = "renovate\\.json5?$";
                 language = "system";
               };
-              gitleaks = {
-                enable = true;
-                name = "gitleaks";
-                entry = "${pkgs.gitleaks}/bin/gitleaks protect --staged --config ${./../.gitleaks.toml}";
-                language = "system";
-                pass_filenames = false;
-              };
+              gitleaks.enable = true;
             };
           };
 
