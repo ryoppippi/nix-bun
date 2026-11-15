@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
@@ -38,7 +42,7 @@ jobs:
         run: |
           version=$(nix run . -- --version)
           echo "Detected version: $version"
-          if ! echo "$version" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$"; then
+          if ! echo "$version" | grep -E "^[0-9]+\\.[0-9]+\\.[0-9]+$"; then
             echo "Error: Version output does not match expected format"
             exit 1
           fi
