@@ -16,14 +16,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(./update.ts | tail -1)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          MESSAGE=$(./update.ts | tail -1)
+          echo "message=$MESSAGE" >> "$GITHUB_OUTPUT"
       - run: 'git config user.email 41898282+github-actions[bot]@users.noreply.github.com'
       - run: 'git config user.name github-actions[bot]'
       - run: 'git add -A'
-      - name: Commit with version
+      - name: Commit
         run: |
           if ! git diff --staged --quiet; then
-            git commit -m "chore: update bun to ${{ steps.update.outputs.version }}"
+            git commit -m "${{ steps.update.outputs.message }}"
           fi
       - run: 'git push -u origin main'

@@ -124,6 +124,7 @@ async function getExistingVersions(): Promise<{
  * @param options.version - Version used by the Nix derivation.
  * @param options.expectedVersion - `bun --version` output, when it differs from `version`.
  * @param options.hashes - SRI hash per Nix platform.
+ * @returns Whether the file content changed.
  */
 async function writeVersionSources(options: {
 	name: string;
@@ -131,7 +132,7 @@ async function writeVersionSources(options: {
 	version: string;
 	expectedVersion?: string;
 	hashes: Record<NixPlatform, string>;
-}): Promise<void> {
+}): Promise<boolean> {
 	const versionedPath = join(import.meta.dir, 'versions', `${options.name}.json`);
 
 	const platformsData: Record<NixPlatform, { url: string; hash: string }> = {} as Record<
@@ -152,7 +153,13 @@ async function writeVersionSources(options: {
 		platforms: platformsData,
 	};
 
+	const file = Bun.file(versionedPath);
+	if ((await file.exists()) && Bun.deepEquals(await file.json(), sourcesData)) {
+		return false;
+	}
+
 	await Bun.write(versionedPath, JSON.stringify(sourcesData, null, 2) + '\n');
+	return true;
 }
 
 /**
@@ -190,13 +197,12 @@ async function processRelease(release: Release): Promise<boolean> {
 		return false;
 	}
 
-	await writeVersionSources({
+	return writeVersionSources({
 		name: version,
 		tag: `bun-v${version}`,
 		version,
 		hashes,
 	});
-	return true;
 }
 
 /**
@@ -207,8 +213,10 @@ async function processRelease(release: Release): Promise<boolean> {
  * compiles into the canary builds. The derivation version additionally carries
  * the snapshot date of the assets, following the nixpkgs `-unstable-<date>`
  * convention, so that each rebuild is distinguishable.
+ *
+ * @returns The canary version, or `null` if the sources did not change.
  */
-async function updateCanary(): Promise<boolean> {
+async function updateCanary(): Promise<string | null> {
 	const release = await fetchJSON<Release>(`${REPO_API}/tags/${CANARY}`);
 
 	const packageJsonResponse = await fetch(MAIN_PACKAGE_JSON);
@@ -221,7 +229,7 @@ async function updateCanary(): Promise<boolean> {
 
 	const hashes = await collectHashes(release, CANARY);
 	if (hashes === null) {
-		return false;
+		return null;
 	}
 
 	// Assets are re-uploaded on every canary build, so the newest asset
@@ -233,16 +241,20 @@ async function updateCanary(): Promise<boolean> {
 
 	const version = `${baseVersion}-unstable-${snapshot}`;
 
-	await writeVersionSources({
+	const changed = await writeVersionSources({
 		name: CANARY,
 		tag: CANARY,
 		version,
 		expectedVersion: baseVersion,
 		hashes,
 	});
+	if (!changed) {
+		console.log('  Canary is up to date');
+		return null;
+	}
 
 	console.log(`  Updated canary to ${version}`);
-	return true;
+	return version;
 }
 
 const { versions: existingVersions, latest: currentVersion } = await getExistingVersions();
@@ -262,6 +274,7 @@ console.log(`Latest version:  ${latestVersion}`);
 const existingArray = [...existingVersions].sort((a, b) => semver.order(a, b));
 const earliest = existingArray[0];
 
+const addedVersions: string[] = [];
 const missingVersions = allVersions.filter(
 	(version) =>
 		!existingVersions.has(version) && (!earliest || semver.order(version, earliest) >= 0),
@@ -286,16 +299,22 @@ if (missingVersions.length === 0) {
 		console.log(`Processing ${version}...`);
 		const ok = await processRelease(release);
 		if (ok) {
+			addedVersions.push(version);
 			console.log(`  Added ${version}`);
 		}
 	}
 }
 
 console.log('Processing canary...');
-await updateCanary();
+const canaryVersion = await updateCanary();
 
 console.log('Formatting with oxfmt...');
 await $`oxfmt --config ${join(import.meta.dir, '.oxfmtrc.jsonc')} versions/*.json`.quiet();
 console.log('Done!');
 
-console.log(latestVersion);
+const changes = [
+	...(addedVersions.length > 0 ? [`add bun ${addedVersions.join(', ')}`] : []),
+	...(canaryVersion === null ? [] : [`update bun canary to ${canaryVersion}`]),
+];
+// The last line is the commit message read by the update workflow.
+console.log(changes.length > 0 ? `chore: ${changes.join(' and ')}` : '');
