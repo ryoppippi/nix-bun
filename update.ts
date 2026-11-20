@@ -1,6 +1,6 @@
 #!/usr/bin/env nix
 /*
-#! nix shell --inputs-from . nixpkgs#bun nixpkgs#oxfmt -c bun
+#! nix shell --inputs-from . .#bun nixpkgs#oxfmt -c bun
 */
 
 import { $, Glob, semver } from 'bun';
